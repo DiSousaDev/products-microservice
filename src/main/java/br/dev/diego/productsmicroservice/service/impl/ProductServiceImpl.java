@@ -6,11 +6,10 @@ import br.dev.diego.productsmicroservice.service.ProductService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -33,15 +32,16 @@ public class ProductServiceImpl implements ProductService {
                 request.price(),
                 request.quantity()
         );
+        log.info("Antes de solicitar o envio da mensagem....");
 
-        CompletableFuture<SendResult<String, ProductCreatedEvent>> future = kafkaTemplate.send("product-created-events-topic", productId, productCreatedEvent);
-        future.whenComplete((result, ex) -> {
-            if (ex != null) {
-                log.error("Failed to send message {}...", ex.getMessage());
-            } else {
-                log.info("Product created event sent: {}", result.getProducerRecord().value());
-            }
-        });
+        try {
+            kafkaTemplate.send("product-created-events-topic", productId, productCreatedEvent).get();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+
         log.info("Returning productId {}", productId);
         return productId;
     }
